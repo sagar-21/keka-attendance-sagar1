@@ -3,7 +3,7 @@
 // @namespace    https://dyadtech.keka.com/
 // @version      4.3.0
 // @description  Today's attendance + alternate-week WFH — cinematic 8-theme dashboard (Dragon Fire, Ocean, Nebula, Matrix, Synthwave, Gold, Frost, Glass)
-// @author       Sagar
+// @author       Deepak
 // @match        https://dyadtech.keka.com/*
 // @grant        none
 // @run-at       document-idle
