@@ -94,14 +94,9 @@
     <div class="card">
       <h1 style="justify-content:center;">🔒 Locked</h1>
       <div class="sub">Enter your PIN to open the settings panel.</div>
-      <input type="password" id="pinInput" inputmode="numeric" maxlength="12" placeholder="••••••" autofocus>
+      <input type="password" id="pinInput" inputmode="numeric" maxlength="20" placeholder="••••••" autofocus>
       <button class="wide" id="unlockBtn" style="margin-top:14px;">Unlock</button>
       <div class="hint" id="pinErr" style="color:var(--bad); min-height:16px; margin-top:8px;"></div>
-      <div class="steps" style="text-align:left; margin-top:20px;">
-        First time setting this up? Open <b>browser console (F12)</b> on this page and run:<br>
-        <code>hashPin("your-new-pin")</code><br>
-        Copy the number it prints, paste it into <b>PIN_HASH</b> near the top of this file's script, then re-deploy.
-      </div>
     </div>
   </div>
 
@@ -167,12 +162,11 @@
   <div class="toast" id="toast"></div>
 
 <script>
-const SECRET = 'Kk4pT-9xQ2vR7mZs-Sagar-Panel-Secret-2026';
+/* ===================== EDIT THESE TWO LINES ONLY ===================== */
+const PIN = 'sagar2026';                                    // <-- change this to your own PIN, then re-upload the file
 const CONFIG_URL = 'https://cdn.jsdelivr.net/gh/sagar-21/keka-attendance-sagar1@main/kap-config.json';
-const PIN_HASH = 0xa6f48af; // default PIN is "sagar2026" — CHANGE THIS before hosting publicly
-
-function fnv(s) { let h = 0x811c9dc5; for (const ch of s) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h; }
-window.hashPin = (pin) => { const h = fnv(String(pin)); console.log('PIN_HASH =', '0x' + h.toString(16), ' (paste this into the file)'); return h; };
+/* ======================================================================= */
+const SECRET = 'Kk4pT-9xQ2vR7mZs-Sagar-Panel-Secret-2026';   // must match REMOTE_SECRET inside the userscript
 
 function rc4(keyBytes, dataBytes) {
   const S = new Uint8Array(256);
@@ -213,7 +207,7 @@ function toast(msg) {
 
 function tryUnlock() {
   const val = document.getElementById('pinInput').value;
-  if (fnv(val) === PIN_HASH) {
+  if (val === PIN) {
     document.getElementById('lockScreen').style.display = 'none';
     document.getElementById('mainWrap').classList.add('show');
     try { sessionStorage.setItem('kapPanelUnlocked', '1'); } catch (e) {}
