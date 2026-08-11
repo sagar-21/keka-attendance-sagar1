@@ -17,7 +17,7 @@
     display:flex; align-items:center; justify-content:center; padding:32px 16px;
   }
   .card{
-    width:100%; max-width:600px; background:var(--card); border:1px solid var(--stroke);
+    width:100%; max-width:640px; background:var(--card); border:1px solid var(--stroke);
     border-radius:20px; padding:32px 30px; box-shadow:0 40px 90px rgba(0,0,0,.6);
   }
   h1{font-size:20px; margin:0 0 4px; display:flex; align-items:center; gap:10px;}
@@ -29,7 +29,7 @@
     border:1px solid var(--stroke); color:var(--txt); font-size:14px; font-family:inherit; outline:none;
   }
   input:focus, textarea:focus{border-color:var(--stroke-hi);}
-  textarea{resize:vertical; min-height:70px;}
+  textarea{resize:vertical; min-height:60px;}
   .row{display:flex; gap:10px;}
   .row > *{flex:1;}
   .hint{font-size:12px; color:var(--muted); margin-top:5px;}
@@ -42,6 +42,7 @@
   button:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(255,140,20,.35);}
   button:disabled{opacity:.5; cursor:not-allowed; transform:none;}
   button.secondary{background:var(--panel-hi); color:var(--txt); border:1px solid var(--stroke);}
+  button.danger{background:linear-gradient(135deg,#ff5560,#ff8a5b); color:#1a0500;}
   button.wide{width:100%; margin-top:6px;}
   button.chip{padding:8px 14px; font-size:12px; font-weight:700; background:var(--panel-hi); color:var(--txt); border:1px solid var(--stroke);}
   .chips{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
@@ -54,37 +55,34 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
   .divider{height:1px; background:var(--stroke); margin:24px 0;}
   .sec-title{font-size:13px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
-  .prev-wrap{padding:20px; border-radius:16px; background:radial-gradient(120% 100% at 30% 0%, #1a2032, #0a0e18); border:1px solid var(--stroke); margin-bottom:18px; min-height:70px; display:flex; align-items:center;}
-  .prev-pop{display:flex; align-items:center; gap:14px; width:100%; padding:16px 18px; border-radius:20px; background:rgba(20,22,34,.96); border:1px solid rgba(255,255,255,.3); color:#fff; box-shadow:0 18px 40px rgba(0,0,0,.5);}
-  .prev-ic{flex:none; width:44px; height:44px; border-radius:13px; display:grid; place-items:center; font-size:22px; background:linear-gradient(140deg, var(--accent), var(--accent-2));}
-  .prev-body{flex:1; min-width:0;}
-  .prev-title{font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--accent-2); margin-bottom:3px;}
-  .prev-text{font-size:14px; font-weight:700; line-height:1.3;}
-  .prev-empty{color:var(--muted); font-size:13px; margin:0 auto;}
-  .live-box{background:var(--panel); border:1px solid var(--stroke); border-radius:14px; padding:14px 16px; margin-top:14px; font-size:13px; line-height:1.7;}
+  .live-box{background:var(--panel); border:1px solid var(--stroke); border-radius:14px; padding:14px 16px; margin-top:10px; font-size:13px; line-height:1.7;}
   .live-box b{color:var(--txt);}
   .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px;}
   .dot.ok{background:var(--ok); box-shadow:0 0 8px var(--ok);}
   .dot.warn{background:#ffc93d;}
   .dot.bad{background:var(--bad);}
-  #loginScreen, #setupScreen{position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:1000;}
+  #loginScreen, #setupScreen, #totpModal{position:fixed; inset:0; background:rgba(5,7,15,.85); display:flex; align-items:center; justify-content:center; z-index:1000;}
+  #loginScreen{background:var(--bg);}
   #mainWrap{display:none;}
   #mainWrap.show{display:block;}
-  .userbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; font-size:13px; color:var(--muted);}
+  .userbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; font-size:13px; color:var(--muted); flex-wrap:wrap; gap:8px;}
   .userbar button{padding:8px 14px; font-size:12px;}
+  .notice-item{display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px; background:var(--panel); border:1px solid var(--stroke); margin-bottom:8px;}
+  .notice-txt{flex:1; min-width:0; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis;}
+  .notice-empty{font-size:13px; color:var(--muted); text-align:center; padding:10px;}
+  #totpModal .card{max-width:340px; text-align:center;}
+  #totpCode{text-align:center; font-size:24px; letter-spacing:.3em; font-family:'Consolas',monospace;}
+  .totp-secret{font-family:'Consolas',monospace; font-size:14px; word-break:break-all; background:var(--panel); border:1px solid var(--stroke); border-radius:10px; padding:10px; margin:10px 0;}
 </style>
 </head>
 <body>
 
-  <div id="setupScreen">
+  <div id="setupScreen" style="position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; z-index:1000;">
     <div class="card">
       <h1>🔥 Firebase setup needed</h1>
-      <div class="sub">Paste your Firebase config below (from Firebase console → Project settings → your web app). This is saved only in this browser.</div>
+      <div class="sub">Paste your Firebase config JSON below (only the {...} object — not the whole code snippet). Saved only in this browser.</div>
       <textarea id="fbConfigInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"..."}' style="min-height:140px; font-family:monospace; font-size:12px;"></textarea>
       <button class="wide" id="saveFbConfig" style="margin-top:12px;">Save &amp; continue</button>
-      <div class="steps">
-        Don't have this yet? See the setup steps in the chat — create a Firebase project, enable Realtime Database + Email/Password Auth, then copy the config object from <b>Project settings → General → Your apps</b>.
-      </div>
     </div>
   </div>
 
@@ -99,45 +97,57 @@
     </div>
   </div>
 
+  <div id="totpModal" style="display:none;">
+    <div class="card">
+      <h1 style="justify-content:center;">🔐 Verify it's you</h1>
+      <div class="sub" style="text-align:center;" id="totpPrompt">Enter the 6-digit code from your authenticator app.</div>
+      <input type="text" id="totpCode" inputmode="numeric" maxlength="6" placeholder="000000" autofocus>
+      <button class="wide" id="totpConfirmBtn" style="margin-top:12px;">Confirm</button>
+      <button class="secondary wide" id="totpCancelBtn" style="margin-top:8px;">Cancel</button>
+      <div class="hint" id="totpErr" style="color:var(--bad); min-height:16px; margin-top:8px; text-align:center;"></div>
+    </div>
+  </div>
+
   <div id="mainWrap">
   <div class="card">
     <div class="userbar">
       <span id="userEmail"></span>
-      <button class="secondary" id="logoutBtn">Sign out</button>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" id="setup2faBtn">🔐 2FA setup</button>
+        <button class="secondary" id="logoutBtn">Sign out</button>
+      </div>
     </div>
     <h1>⚙️ Attendance Pro <span class="badge">Live · Firebase</span></h1>
-    <div class="sub">Changes here appear for everyone instantly — no GitHub, no copy-paste. Anyone can read; only you (signed in) can save.</div>
+    <div class="sub">Changes here appear for everyone within ~15 seconds — no reload needed, no GitHub. Writes require your password + a 2FA code.</div>
 
+    <div id="sessionInfo" class="live-box" style="margin-bottom:20px;"></div>
+
+    <div class="sec-title">🎯 Today's target</div>
     <div class="chips">
       <button class="chip" data-h="8" data-m="30">🕗 Normal · 8h 30m</button>
       <button class="chip" data-h="6" data-m="0">🏃 Early release · 6h</button>
       <button class="chip" data-h="4" data-m="0">🌤 Half day · 4h</button>
       <button class="chip" data-h="0" data-m="0">🎉 Day off · 0h</button>
     </div>
-
     <div class="field">
-      <label>Today's target</label>
       <div class="row">
         <input type="number" id="th" min="0" max="24" placeholder="Hours" value="8">
         <input type="number" id="tm" min="0" max="59" placeholder="Minutes" value="30">
       </div>
     </div>
-
-    <div class="field">
-      <label>Notice message (optional)</label>
-      <textarea id="notice" placeholder="e.g. Leaving early today, 5 PM!"></textarea>
-    </div>
-
-    <div class="sec-title">👀 Live preview</div>
-    <div class="prev-wrap" id="previewWrap"><div class="prev-empty">Type a notice above to preview it here</div></div>
-
-    <button class="wide" id="saveBtn">💾 Save — updates everyone instantly</button>
-    <div id="saveStatus" class="hint" style="min-height:16px; margin-top:8px;"></div>
+    <button class="wide" id="saveTargetBtn">💾 Save target</button>
 
     <div class="divider"></div>
-    <div class="sec-title">📡 Currently live</div>
-    <div id="currentLive" class="live-box">Loading…</div>
-    <button class="secondary wide" id="clearBtn" style="margin-top:10px;">↺ Reset to default (8h 30m, no notice)</button>
+
+    <div class="sec-title">📣 Notices (multiple, everyone sees active ones)</div>
+    <div class="field">
+      <textarea id="newNoticeText" placeholder="e.g. Leaving early today, 5 PM!"></textarea>
+    </div>
+    <button class="wide" id="addNoticeBtn">＋ Publish new notice</button>
+    <div id="noticesList" style="margin-top:14px;"></div>
+
+    <div class="divider"></div>
+    <div class="hint" id="statusMsg" style="min-height:16px;"></div>
   </div>
   </div>
 
@@ -153,6 +163,96 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
+/* ── TOTP (RFC 6238) — same tech as Google Authenticator, fully offline ── */
+function base32Encode(bytes) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0, value = 0, output = '';
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i]; bits += 8;
+    while (bits >= 5) { output += alphabet[(value >>> (bits - 5)) & 31]; bits -= 5; }
+  }
+  if (bits > 0) output += alphabet[(value << (5 - bits)) & 31];
+  return output;
+}
+function base32Decode(str) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  str = str.replace(/=+$/, '').toUpperCase();
+  let bits = 0, value = 0; const out = [];
+  for (const ch of str) {
+    const idx = alphabet.indexOf(ch);
+    if (idx === -1) continue;
+    value = (value << 5) | idx; bits += 5;
+    if (bits >= 8) { out.push((value >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return new Uint8Array(out);
+}
+async function hmacSha1(keyBytes, msgBytes) {
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, msgBytes);
+  return new Uint8Array(sig);
+}
+async function totp(secretBase32, forTime = Date.now(), timeStepSec = 30, digits = 6) {
+  const key = base32Decode(secretBase32);
+  const counter = Math.floor(forTime / 1000 / timeStepSec);
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf);
+  view.setUint32(4, counter, false);
+  view.setUint32(0, Math.floor(counter / 2 ** 32), false);
+  const hmac = await hmacSha1(key, new Uint8Array(buf));
+  const offset = hmac[hmac.length - 1] & 0xf;
+  const code = ((hmac[offset] & 0x7f) << 24 | (hmac[offset + 1] & 0xff) << 16 | (hmac[offset + 2] & 0xff) << 8 | (hmac[offset + 3] & 0xff)) % (10 ** digits);
+  return String(code).padStart(digits, '0');
+}
+async function verifyTotp(secretBase32, codeEntered) {
+  const now = Date.now();
+  for (const skew of [0, -30000, 30000]) {
+    if (await totp(secretBase32, now + skew) === codeEntered.trim()) return true;
+  }
+  return false;
+}
+
+const TOTP_KEY = 'kapAdminTotpSecret_v1';
+function getTotpSecret() { try { return localStorage.getItem(TOTP_KEY) || ''; } catch (e) { return ''; } }
+function setTotpSecret(s) { try { localStorage.setItem(TOTP_KEY, s); } catch (e) {} }
+
+function askTotp(promptText) {
+  return new Promise((resolve) => {
+    const secret = getTotpSecret();
+    if (!secret) { resolve(true); return; } // 2FA not set up yet — allow (first-run), but nudge to set up
+    const modal = document.getElementById('totpModal');
+    document.getElementById('totpPrompt').textContent = promptText || 'Enter the 6-digit code from your authenticator app.';
+    document.getElementById('totpCode').value = '';
+    document.getElementById('totpErr').textContent = '';
+    modal.style.display = 'flex';
+    document.getElementById('totpCode').focus();
+    const confirmBtn = document.getElementById('totpConfirmBtn');
+    const cancelBtn = document.getElementById('totpCancelBtn');
+    const cleanup = () => { modal.style.display = 'none'; confirmBtn.onclick = null; cancelBtn.onclick = null; };
+    confirmBtn.onclick = async () => {
+      const code = document.getElementById('totpCode').value;
+      const ok = await verifyTotp(secret, code);
+      if (ok) { cleanup(); resolve(true); }
+      else { document.getElementById('totpErr').textContent = 'Incorrect code — try again.'; }
+    };
+    cancelBtn.onclick = () => { cleanup(); resolve(false); };
+  });
+}
+
+/* ── 2FA setup flow ── */
+document.getElementById('setup2faBtn').addEventListener('click', async () => {
+  const existing = getTotpSecret();
+  if (existing) {
+    const ok = confirm('2FA is already set up on this browser. Reset it and generate a new secret?');
+    if (!ok) return;
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const secret = base32Encode(bytes);
+  setTotpSecret(secret);
+  alert('New 2FA secret generated:\\n\\n' + secret + '\\n\\nOpen Google Authenticator (or Authy) → Add account → "Enter a setup key" → paste this secret, type: Time-based.\\n\\nYou will need the 6-digit code from that app for every save/publish/delete from now on.');
+  toast('2FA secret generated — set up your authenticator app now');
+});
+
+/* ── Firebase init + auth ── */
 const FB_CFG_KEY = 'kapFirebaseConfig_v1';
 let db, auth;
 
@@ -167,12 +267,26 @@ function initFirebase(cfg) {
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('mainWrap').classList.add('show');
       document.getElementById('userEmail').textContent = user.email;
-      loadCurrent();
+      loadTarget();
+      listenNotices();
+      renderSessionInfo(user);
     } else {
       document.getElementById('mainWrap').classList.remove('show');
       document.getElementById('loginScreen').style.display = 'flex';
     }
   });
+}
+
+async function renderSessionInfo(user) {
+  try {
+    const tokenResult = await user.getIdTokenResult();
+    const expiresIn = Math.round((new Date(tokenResult.expirationTime) - Date.now()) / 60000);
+    document.getElementById('sessionInfo').innerHTML =
+      '<span class="dot ok"></span><b>Authenticated session (JWT)</b><br>' +
+      'Signed in as: <b>' + user.email + '</b><br>' +
+      'Token auto-refreshes; current one expires in ~' + expiresIn + ' min<br>' +
+      '2FA: <b>' + (getTotpSecret() ? 'Enabled' : 'Not set up — click "2FA setup" above') + '</b>';
+  } catch (e) {}
 }
 
 try {
@@ -202,6 +316,7 @@ document.getElementById('loginBtn').addEventListener('click', () => {
 });
 document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
 
+/* ── target ── */
 document.querySelectorAll('.chip').forEach(btn => {
   btn.addEventListener('click', () => {
     document.getElementById('th').value = btn.dataset.h;
@@ -210,66 +325,61 @@ document.querySelectorAll('.chip').forEach(btn => {
   });
 });
 
-function renderPreview() {
-  const notice = document.getElementById('notice').value.trim();
-  const wrap = document.getElementById('previewWrap');
-  if (!notice) { wrap.innerHTML = '<div class="prev-empty">Type a notice above to preview it here</div>'; return; }
-  wrap.innerHTML = '<div class="prev-pop"><div class="prev-ic">📣</div><div class="prev-body"><div class="prev-title">Notice</div><div class="prev-text"></div></div></div>';
-  wrap.querySelector('.prev-text').textContent = notice;
-}
-document.getElementById('notice').addEventListener('input', renderPreview);
-
-function describeConfig(cfg) {
-  if (!cfg || typeof cfg.todayTargetMin !== 'number') return 'No override — using the default 8h 30m target.';
-  const h = Math.floor(cfg.todayTargetMin / 60), m = cfg.todayTargetMin % 60;
-  let s = `Target override: <b>${h}h ${m}m</b>`;
-  if (cfg.notice) s += `<br>Notice: <b>"${cfg.notice}"</b>`;
-  return s;
-}
-
-function loadCurrent() {
+function loadTarget() {
   db.ref('kapConfig').once('value').then(snap => {
     const cfg = snap.val();
-    document.getElementById('currentLive').innerHTML = '<span class="dot ok"></span>' + describeConfig(cfg);
     if (cfg && typeof cfg.todayTargetMin === 'number') {
       document.getElementById('th').value = Math.floor(cfg.todayTargetMin / 60);
       document.getElementById('tm').value = cfg.todayTargetMin % 60;
-      document.getElementById('notice').value = cfg.notice || '';
-      renderPreview();
     }
-  }).catch(() => {
-    document.getElementById('currentLive').innerHTML = '<span class="dot bad"></span>Could not load (check your database rules).';
   });
 }
 
-document.getElementById('saveBtn').addEventListener('click', () => {
+document.getElementById('saveTargetBtn').addEventListener('click', async () => {
+  const ok = await askTotp('Enter your 2FA code to save the new target.');
+  if (!ok) return;
   const h = parseInt(document.getElementById('th').value, 10) || 0;
   const m = parseInt(document.getElementById('tm').value, 10) || 0;
-  const notice = document.getElementById('notice').value.trim();
-  const payload = { todayTargetMin: h * 60 + m, updatedAt: Date.now() };
-  if (notice) { payload.notice = notice; payload.noticeId = 'notice-' + Date.now(); }
-
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true;
-  document.getElementById('saveStatus').textContent = 'Saving…';
-  db.ref('kapConfig').set(payload).then(() => {
-    document.getElementById('saveStatus').textContent = 'Saved — live for everyone now ✓';
-    toast('Published — everyone will see this on next load');
-    loadCurrent();
-  }).catch(err => {
-    document.getElementById('saveStatus').textContent = 'Failed: ' + err.message;
-  }).finally(() => { btn.disabled = false; });
+  db.ref('kapConfig').set({ todayTargetMin: h * 60 + m, updatedAt: Date.now() }).then(() => {
+    toast('Target published — live for everyone within ~15s');
+    document.getElementById('statusMsg').textContent = 'Target saved ✓';
+  }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 
-document.getElementById('clearBtn').addEventListener('click', () => {
-  db.ref('kapConfig').set({ todayTargetMin: 510, updatedAt: Date.now() }).then(() => {
-    toast('Reset to default');
-    document.getElementById('th').value = 8;
-    document.getElementById('tm').value = 30;
-    document.getElementById('notice').value = '';
-    renderPreview();
-    loadCurrent();
-  });
+/* ── notices (multiple, add/delete) ── */
+function renderNotices(notices) {
+  const el = document.getElementById('noticesList');
+  const ids = Object.keys(notices || {});
+  if (!ids.length) { el.innerHTML = '<div class="notice-empty">No active notices</div>'; return; }
+  el.innerHTML = ids.map(id => `
+    <div class="notice-item" data-id="${id}">
+      <span class="notice-txt"></span>
+      <button class="danger" data-del="${id}" style="padding:7px 12px; font-size:12px;">🗑 Delete</button>
+    </div>`).join('');
+  ids.forEach(id => { el.querySelector(`[data-id="${id}"] .notice-txt`).textContent = notices[id].text || ''; });
+  el.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
+    const ok = await askTotp('Enter your 2FA code to delete this notice.');
+    if (!ok) return;
+    db.ref('kapNotices/' + btn.dataset.del).remove().then(() => toast('Notice deleted — removed for everyone within ~15s'));
+  }));
+}
+
+function listenNotices() {
+  // real-time listener for the ADMIN PANEL itself (instant here; the userscript
+  // uses polling instead, to avoid loading the Firebase SDK into the Keka page)
+  db.ref('kapNotices').on('value', snap => renderNotices(snap.val() || {}));
+}
+
+document.getElementById('addNoticeBtn').addEventListener('click', async () => {
+  const text = document.getElementById('newNoticeText').value.trim();
+  if (!text) { toast('Write a notice first'); return; }
+  const ok = await askTotp('Enter your 2FA code to publish this notice.');
+  if (!ok) return;
+  const id = 'n' + Date.now();
+  db.ref('kapNotices/' + id).set({ text, createdAt: Date.now() }).then(() => {
+    document.getElementById('newNoticeText').value = '';
+    toast('Notice published — live for everyone within ~15s');
+  }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 </script>
 </body>
