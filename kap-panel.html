@@ -220,6 +220,31 @@
       <input type="checkbox" id="noticeRemovable" checked style="width:18px; height:18px; accent-color:var(--accent); cursor:pointer;">
       <label for="noticeRemovable" class="hint" style="margin:0; cursor:pointer;">Let users dismiss (✕) this notice themselves — uncheck to make it mandatory (only you can remove it)</label>
     </div>
+
+    <div class="field">
+      <label>How long should this stay visible?</label>
+      <div class="row" style="margin-bottom:8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--txt);">
+          <input type="radio" name="expiryMode" id="expiryNever" value="never" checked style="accent-color:var(--accent);"> Never expires
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--txt);">
+          <input type="radio" name="expiryMode" id="expiryUntil" value="until" style="accent-color:var(--accent);"> Until a date/time
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--txt);">
+          <input type="radio" name="expiryMode" id="expiryFor" value="for" style="accent-color:var(--accent);"> For a duration
+        </label>
+      </div>
+      <input type="datetime-local" id="expiryUntilInput" style="display:none;">
+      <select id="expiryForInput" style="display:none;">
+        <option value="3600000">1 hour</option>
+        <option value="21600000">6 hours</option>
+        <option value="43200000">12 hours</option>
+        <option value="86400000" selected>1 day</option>
+        <option value="259200000">3 days</option>
+        <option value="604800000">1 week</option>
+      </select>
+    </div>
+
     <button class="wide" id="addNoticeBtn">＋ Publish new notice</button>
     <div id="noticesList" style="margin-top:14px;"></div>
 
@@ -602,21 +627,33 @@ document.getElementById('saveTargetBtn').addEventListener('click', async () => {
   }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 
-/* ── notices (multiple, add/delete) ── */
+/* ── notices (multiple, add/delete, with optional expiry) ── */
+function fmtExpiry(n) {
+  if (!n.expiresAt) return 'Never expires';
+  const ms = Number(n.expiresAt);
+  if (Date.now() > ms) return '⏳ EXPIRED (hidden from users)';
+  return 'Until ' + new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
 function renderNotices(notices) {
   const el = document.getElementById('noticesList');
   const ids = Object.keys(notices || {});
   if (!ids.length) { el.innerHTML = '<div class="notice-empty">No active notices</div>'; return; }
   el.innerHTML = ids.map(id => `
-    <div class="notice-item" data-id="${id}">
-      <span class="notice-txt"></span>
+    <div class="notice-item" data-id="${id}" style="flex-wrap:wrap;">
+      <span class="notice-txt" style="flex-basis:100%;"></span>
       <span class="badge" style="background:rgba(255,255,255,.08); color:var(--muted); border-color:var(--stroke);"></span>
-      <button class="danger" data-del="${id}" style="padding:7px 12px; font-size:12px;">🗑 Delete</button>
+      <span class="badge expiry-badge" style="background:rgba(255,255,255,.08); color:var(--muted); border-color:var(--stroke);"></span>
+      <button class="danger" data-del="${id}" style="padding:7px 12px; font-size:12px; margin-left:auto;">🗑 Delete</button>
     </div>`).join('');
   ids.forEach(id => {
     el.querySelector(`[data-id="${id}"] .notice-txt`).textContent = notices[id].text || '';
     const removable = notices[id].removable !== false;
     el.querySelector(`[data-id="${id}"] .badge`).textContent = removable ? '✕ dismissible' : '🔒 mandatory';
+    const expBadge = el.querySelector(`[data-id="${id}"] .expiry-badge`);
+    expBadge.textContent = fmtExpiry(notices[id]);
+    if (notices[id].expiresAt && Date.now() > Number(notices[id].expiresAt)) {
+      expBadge.style.color = 'var(--bad)'; expBadge.style.borderColor = 'var(--bad)';
+    }
   });
   el.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
     const ok = await askTotp('Enter your 2FA code to delete this notice.');
@@ -631,16 +668,41 @@ function listenNotices() {
   db.ref('kapNotices').on('value', snap => renderNotices(snap.val() || {}));
 }
 
+/* expiry-mode radio toggling */
+document.querySelectorAll('input[name="expiryMode"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.getElementById('expiryUntilInput').style.display = document.getElementById('expiryUntil').checked ? 'block' : 'none';
+    document.getElementById('expiryForInput').style.display = document.getElementById('expiryFor').checked ? 'block' : 'none';
+  });
+});
+
+function computeExpiresAt() {
+  if (document.getElementById('expiryUntil').checked) {
+    const v = document.getElementById('expiryUntilInput').value;
+    if (!v) return null;
+    return new Date(v).getTime();
+  }
+  if (document.getElementById('expiryFor').checked) {
+    return Date.now() + parseInt(document.getElementById('expiryForInput').value, 10);
+  }
+  return null; // never expires
+}
+
 document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   const text = document.getElementById('newNoticeText').value.trim();
   if (!text) { toast('Write a notice first'); return; }
+  const expiresAt = computeExpiresAt();
+  if (document.getElementById('expiryUntil').checked && !expiresAt) { toast('Pick a date/time first'); return; }
   const ok = await askTotp('Enter your 2FA code to publish this notice.');
   if (!ok) return;
   const removable = document.getElementById('noticeRemovable').checked;
   const id = 'n' + Date.now();
-  db.ref('kapNotices/' + id).set({ text, createdAt: Date.now(), removable }).then(() => {
+  const payload = { text, createdAt: Date.now(), removable };
+  if (expiresAt) payload.expiresAt = expiresAt;
+  db.ref('kapNotices/' + id).set(payload).then(() => {
     document.getElementById('newNoticeText').value = '';
-    toast(removable ? 'Notice published (dismissible) — live within ~15s' : 'Notice published (mandatory, no ✕ for users) — live within ~15s');
+    const expiryMsg = expiresAt ? (' · expires ' + new Date(expiresAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })) : '';
+    toast((removable ? 'Notice published (dismissible)' : 'Notice published (mandatory)') + expiryMsg);
   }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 </script>
