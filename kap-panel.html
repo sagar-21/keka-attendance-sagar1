@@ -86,6 +86,17 @@
     </div>
   </div>
 
+  <div id="loginTotpScreen" style="display:none; position:fixed; inset:0; background:var(--bg); align-items:center; justify-content:center; z-index:1000;">
+    <div class="card" style="max-width:360px; text-align:center;">
+      <h1 style="justify-content:center;">🔐 Second step</h1>
+      <div class="sub">Password verified. Now enter your authenticator code to finish signing in.</div>
+      <input type="text" id="loginTotpCode" inputmode="numeric" maxlength="6" placeholder="000000" autofocus>
+      <button class="wide" id="loginTotpConfirmBtn" style="margin-top:12px;">Continue</button>
+      <button class="secondary wide" id="loginTotpCancelBtn" style="margin-top:8px;">Sign out</button>
+      <div class="hint" id="loginTotpErr" style="color:var(--bad); min-height:16px; margin-top:8px;"></div>
+    </div>
+  </div>
+
   <div id="loginScreen" style="display:none;">
     <div class="card" style="max-width:360px;">
       <h1 style="justify-content:center;">🔒 Admin Login</h1>
@@ -105,6 +116,49 @@
       <button class="wide" id="totpConfirmBtn" style="margin-top:12px;">Confirm</button>
       <button class="secondary wide" id="totpCancelBtn" style="margin-top:8px;">Cancel</button>
       <div class="hint" id="totpErr" style="color:var(--bad); min-height:16px; margin-top:8px; text-align:center;"></div>
+    </div>
+  </div>
+
+  <div id="totpResetGate" style="display:none;">
+    <div class="card" style="max-width:360px; text-align:center;">
+      <h1 style="justify-content:center;">🔐 Confirm reset</h1>
+      <div class="sub">2FA is already active. Enter your CURRENT code to reset it and generate a new one.</div>
+      <input type="text" id="totpResetCode" inputmode="numeric" maxlength="6" placeholder="000000" autofocus>
+      <button class="wide" id="totpResetConfirmBtn" style="margin-top:12px;">Verify &amp; continue</button>
+      <button class="secondary wide" id="totpResetCancelBtn" style="margin-top:8px;">Cancel</button>
+      <div class="hint" id="totpResetErr" style="color:var(--bad); min-height:16px; margin-top:8px;"></div>
+      <div class="hint" style="margin-top:14px;"><a href="#" id="lostAccessLink" style="color:var(--accent-2); text-decoration:underline; cursor:pointer;">Lost access to your authenticator? Answer security questions instead</a></div>
+    </div>
+  </div>
+
+  <div id="secqAnswerScreen" style="display:none;">
+    <div class="card" style="max-width:400px;">
+      <h1 style="justify-content:center;">🛡️ Security questions</h1>
+      <div class="sub" style="text-align:center;">Answer both correctly to reset your 2FA without the old code.</div>
+      <div id="secqQuestionsArea"></div>
+      <button class="wide" id="secqVerifyBtn" style="margin-top:10px;">Verify answers</button>
+      <button class="secondary wide" id="secqCancelBtn" style="margin-top:8px;">Cancel</button>
+      <div class="hint" id="secqErr" style="color:var(--bad); min-height:16px; margin-top:8px; text-align:center;"></div>
+    </div>
+  </div>
+
+  <div id="secqSetupScreen" style="display:none;">
+    <div class="card" style="max-width:440px;">
+      <h1 style="justify-content:center;">🛡️ Set up recovery questions</h1>
+      <div class="sub">These let you reset 2FA later if you ever lose your authenticator device. Pick questions only you would know the answer to, and answers you won't forget.</div>
+      <div class="field">
+        <label>Question 1</label>
+        <input type="text" id="secqQ1" placeholder="e.g. What was your first pet's name?">
+        <input type="text" id="secqA1" placeholder="Answer" style="margin-top:8px;">
+      </div>
+      <div class="field">
+        <label>Question 2</label>
+        <input type="text" id="secqQ2" placeholder="e.g. What city were you born in?">
+        <input type="text" id="secqA2" placeholder="Answer" style="margin-top:8px;">
+      </div>
+      <button class="wide" id="secqSaveBtn">Save recovery questions</button>
+      <button class="secondary wide" id="secqSetupSkipBtn" style="margin-top:8px;">Skip for now</button>
+      <div class="hint" id="secqSetupErr" style="color:var(--bad); min-height:16px; margin-top:8px;"></div>
     </div>
   </div>
 
@@ -132,6 +186,7 @@
       <span id="userEmail"></span>
       <div style="display:flex; gap:8px;">
         <button class="secondary" id="setup2faBtn">🔐 2FA setup</button>
+        <button class="secondary" id="secqManageBtn">🛡️ Recovery Qs</button>
         <button class="secondary" id="logoutBtn">Sign out</button>
       </div>
     </div>
@@ -229,14 +284,23 @@ async function verifyTotp(secretBase32, codeEntered) {
   return false;
 }
 
-const TOTP_KEY = 'kapAdminTotpSecret_v1';
-function getTotpSecret() { try { return localStorage.getItem(TOTP_KEY) || ''; } catch (e) { return ''; } }
-function setTotpSecret(s) { try { localStorage.setItem(TOTP_KEY, s); } catch (e) {} }
+const TOTP_KEY = 'kapAdmin2fa';   // Firebase DB path, NOT localStorage — auth-gated read
+let _totpSecretCache = null;      // in-memory only for this session, never persisted locally
+async function fetchTotpSecret() {
+  if (_totpSecretCache !== null) return _totpSecretCache;
+  const snap = await db.ref(TOTP_KEY + '/secret').once('value');
+  _totpSecretCache = snap.val() || '';
+  return _totpSecretCache;
+}
+async function writeTotpSecret(newSecret) {
+  await db.ref(TOTP_KEY + '/secret').set(newSecret);
+  _totpSecretCache = newSecret;
+}
 
 function askTotp(promptText) {
-  return new Promise((resolve) => {
-    const secret = getTotpSecret();
-    if (!secret) { resolve(true); return; } // 2FA not set up yet — allow (first-run), but nudge to set up
+  return new Promise(async (resolve) => {
+    const secret = await fetchTotpSecret();
+    if (!secret) { resolve(true); return; } // nothing enrolled yet (bootstrap state)
     const modal = document.getElementById('totpModal');
     document.getElementById('totpPrompt').textContent = promptText || 'Enter the 6-digit code from your authenticator app.';
     document.getElementById('totpCode').value = '';
@@ -256,28 +320,136 @@ function askTotp(promptText) {
   });
 }
 
-/* ── 2FA setup flow — secret is shown exactly once, then never again ── */
-document.getElementById('setup2faBtn').addEventListener('click', async () => {
-  const existing = getTotpSecret();
-  if (existing) {
-    const ok = confirm('2FA is already set up on this browser. Reset it and generate a brand new secret? (Your old authenticator entry will stop working.)');
-    if (!ok) return;
-  }
+/* ── 2FA setup flow — secret lives in Firebase (auth-gated), shown once, reset needs old code ── */
+function generateAndShowSecret() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   const secret = base32Encode(bytes);
-  setTotpSecret(secret);
+  writeTotpSecret(secret).then(() => {
+    const modal = document.getElementById('totpSetupModal');
+    const secretEl = document.getElementById('totpSetupSecret');
+    secretEl.textContent = secret;
+    modal.style.display = 'flex';
+    document.getElementById('totpSetupDoneBtn').onclick = async () => {
+      secretEl.textContent = '••••••••••••••••••••••••';
+      modal.style.display = 'none';
+      toast('2FA is now active — a code will be required at login and for every write');
+      renderSessionInfo(auth.currentUser);
+      const secq = await fetchSecQ();
+      if (!secq) showSecQSetup();
+    };
+  });
+}
 
-  const modal = document.getElementById('totpSetupModal');
-  const secretEl = document.getElementById('totpSetupSecret');
-  secretEl.textContent = secret;
-  modal.style.display = 'flex';
+document.getElementById('setup2faBtn').addEventListener('click', async () => {
+  const existing = await fetchTotpSecret();
+  if (!existing) { generateAndShowSecret(); return; }
 
-  document.getElementById('totpSetupDoneBtn').onclick = () => {
-    secretEl.textContent = '••••••••••••••••••••••••';
-    modal.style.display = 'none';
-    toast('2FA is now active — a code will be required for every write');
-    renderSessionInfo(auth.currentUser);
+  const gate = document.getElementById('totpResetGate');
+  document.getElementById('totpResetCode').value = '';
+  document.getElementById('totpResetErr').textContent = '';
+  gate.style.display = 'flex';
+  document.getElementById('totpResetCode').focus();
+  const confirmBtn = document.getElementById('totpResetConfirmBtn');
+  const cancelBtn = document.getElementById('totpResetCancelBtn');
+  const cleanup = () => { gate.style.display = 'none'; confirmBtn.onclick = null; cancelBtn.onclick = null; };
+  confirmBtn.onclick = async () => {
+    const code = document.getElementById('totpResetCode').value;
+    const ok = await verifyTotp(existing, code);
+    if (ok) { cleanup(); generateAndShowSecret(); }
+    else { document.getElementById('totpResetErr').textContent = 'Incorrect code — cannot reset without the current code.'; }
   };
+  cancelBtn.onclick = () => cleanup();
+});
+
+/* ── security-questions recovery path (for when the authenticator is lost) ──
+   Answers are never stored in plain text — only a salted SHA-256 hash, so
+   even someone who can read the database (i.e. already has your password)
+   would still need to guess the actual answer, not just copy it. */
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function normalizeAnswer(a) { return String(a || '').trim().toLowerCase(); }
+function randSalt() { return base32Encode(crypto.getRandomValues(new Uint8Array(8))); }
+
+async function fetchSecQ() {
+  const snap = await db.ref('kapAdmin2fa/secq').once('value');
+  return snap.val();
+}
+async function saveSecQ(q1, a1, q2, a2) {
+  const salt1 = randSalt(), salt2 = randSalt();
+  const hash1 = await sha256Hex(salt1 + normalizeAnswer(a1));
+  const hash2 = await sha256Hex(salt2 + normalizeAnswer(a2));
+  await db.ref('kapAdmin2fa/secq').set({ q1, q2, salt1, hash1, salt2, hash2 });
+}
+async function verifySecQAnswers(a1, a2) {
+  const secq = await fetchSecQ();
+  if (!secq) return false;
+  const h1 = await sha256Hex(secq.salt1 + normalizeAnswer(a1));
+  const h2 = await sha256Hex(secq.salt2 + normalizeAnswer(a2));
+  return h1 === secq.hash1 && h2 === secq.hash2;
+}
+
+function showSecQSetup() {
+  document.getElementById('secqQ1').value = '';
+  document.getElementById('secqA1').value = '';
+  document.getElementById('secqQ2').value = '';
+  document.getElementById('secqA2').value = '';
+  document.getElementById('secqSetupErr').textContent = '';
+  document.getElementById('secqSetupScreen').style.display = 'flex';
+}
+document.getElementById('secqSaveBtn').addEventListener('click', async () => {
+  const q1 = document.getElementById('secqQ1').value.trim();
+  const a1 = document.getElementById('secqA1').value.trim();
+  const q2 = document.getElementById('secqQ2').value.trim();
+  const a2 = document.getElementById('secqA2').value.trim();
+  if (!q1 || !a1 || !q2 || !a2) {
+    document.getElementById('secqSetupErr').textContent = 'Please fill in both questions and answers.';
+    return;
+  }
+  await saveSecQ(q1, a1, q2, a2);
+  document.getElementById('secqSetupScreen').style.display = 'none';
+  toast('Recovery questions saved ✓');
+});
+document.getElementById('secqSetupSkipBtn').addEventListener('click', () => {
+  document.getElementById('secqSetupScreen').style.display = 'none';
+});
+
+/* editing recovery questions later requires proving you still have the authenticator */
+document.getElementById('secqManageBtn').addEventListener('click', async () => {
+  const ok = await askTotp('Enter your 2FA code to manage recovery questions.');
+  if (!ok) return;
+  showSecQSetup();
+});
+
+/* "Lost access?" — reset TOTP via security questions instead of the old code */
+document.getElementById('lostAccessLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  document.getElementById('totpResetGate').style.display = 'none';
+  const secq = await fetchSecQ();
+  if (!secq) {
+    alert('No recovery questions have been set up yet, so this cannot be verified another way. You will need your current authenticator code to reset 2FA.');
+    return;
+  }
+  document.getElementById('secqQuestionsArea').innerHTML = `
+    <div class="field"><label>${secq.q1}</label><input type="text" id="secqAns1" placeholder="Your answer"></div>
+    <div class="field"><label>${secq.q2}</label><input type="text" id="secqAns2" placeholder="Your answer"></div>`;
+  document.getElementById('secqErr').textContent = '';
+  document.getElementById('secqAnswerScreen').style.display = 'flex';
+});
+document.getElementById('secqVerifyBtn').addEventListener('click', async () => {
+  const a1 = document.getElementById('secqAns1').value;
+  const a2 = document.getElementById('secqAns2').value;
+  const ok = await verifySecQAnswers(a1, a2);
+  if (ok) {
+    document.getElementById('secqAnswerScreen').style.display = 'none';
+    generateAndShowSecret();
+  } else {
+    document.getElementById('secqErr').textContent = 'One or both answers are incorrect.';
+  }
+});
+document.getElementById('secqCancelBtn').addEventListener('click', () => {
+  document.getElementById('secqAnswerScreen').style.display = 'none';
 });
 
 /* ── Firebase init + auth ── */
@@ -290,15 +462,40 @@ function initFirebase(cfg) {
   db = firebase.database();
   document.getElementById('setupScreen').style.display = 'none';
 
-  auth.onAuthStateChanged(user => {
+  auth.onAuthStateChanged(async user => {
     if (user) {
       document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('mainWrap').classList.add('show');
-      document.getElementById('userEmail').textContent = user.email;
-      loadTarget();
-      listenNotices();
-      renderSessionInfo(user);
+      _totpSecretCache = null; // force a fresh read for this session
+      const secret = await fetchTotpSecret();
+      if (secret) {
+        // 2FA already enrolled — password alone is NOT enough, require the code before showing anything
+        const gate = document.getElementById('loginTotpScreen');
+        gate.style.display = 'flex';
+        document.getElementById('loginTotpCode').value = '';
+        document.getElementById('loginTotpErr').textContent = '';
+        document.getElementById('loginTotpCode').focus();
+        document.getElementById('loginTotpConfirmBtn').onclick = async () => {
+          const ok = await verifyTotp(secret, document.getElementById('loginTotpCode').value);
+          if (ok) {
+            gate.style.display = 'none';
+            document.getElementById('mainWrap').classList.add('show');
+            document.getElementById('userEmail').textContent = user.email;
+            loadTarget(); listenNotices(); renderSessionInfo(user);
+          } else {
+            document.getElementById('loginTotpErr').textContent = 'Incorrect code.';
+          }
+        };
+        document.getElementById('loginTotpCancelBtn').onclick = () => { gate.style.display = 'none'; auth.signOut(); };
+      } else {
+        // nothing enrolled yet — this is the bootstrap case; let them in to set 2FA up
+        document.getElementById('mainWrap').classList.add('show');
+        document.getElementById('userEmail').textContent = user.email;
+        loadTarget();
+        listenNotices();
+        renderSessionInfo(user);
+      }
     } else {
+      document.getElementById('loginTotpScreen').style.display = 'none';
       document.getElementById('mainWrap').classList.remove('show');
       document.getElementById('loginScreen').style.display = 'flex';
     }
@@ -309,11 +506,12 @@ async function renderSessionInfo(user) {
   try {
     const tokenResult = await user.getIdTokenResult();
     const expiresIn = Math.round((new Date(tokenResult.expirationTime) - Date.now()) / 60000);
+    const secret = await fetchTotpSecret();
     document.getElementById('sessionInfo').innerHTML =
       '<span class="dot ok"></span><b>Authenticated session (JWT)</b><br>' +
       'Signed in as: <b>' + user.email + '</b><br>' +
       'Token auto-refreshes; current one expires in ~' + expiresIn + ' min<br>' +
-      '2FA: <b>' + (getTotpSecret() ? 'Enabled' : 'Not set up — click "2FA setup" above') + '</b>';
+      '2FA: <b>' + (secret ? 'Enabled (required at login + every write)' : 'Not set up — click "2FA setup" above') + '</b>';
   } catch (e) {}
 }
 
