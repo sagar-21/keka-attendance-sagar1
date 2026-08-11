@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Attendance Pro — Settings Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0a0e1a; --card:#12172a; --panel:rgba(255,255,255,.04); --panel-hi:rgba(255,255,255,.08);
+    --stroke:rgba(255,255,255,.12); --stroke-hi:rgba(255,255,255,.3);
+    --txt:#eef1fb; --muted:#9aa3c0; --accent:#ff7a1a; --accent-2:#ffc93d; --ok:#2fd873; --bad:#ff5560;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:radial-gradient(120% 100% at 50% -10%, #1a2140, #05070f);
+    color:var(--txt); font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:32px 16px;
+  }
+  .card{
+    width:100%; max-width:620px; background:var(--card); border:1px solid var(--stroke);
+    border-radius:20px; padding:32px 30px; box-shadow:0 40px 90px rgba(0,0,0,.6);
+  }
+  h1{font-size:20px; margin:0 0 4px; display:flex; align-items:center; gap:10px;}
+  .sub{color:var(--muted); font-size:13px; margin-bottom:24px; line-height:1.5;}
+  label{display:block; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:6px; letter-spacing:.02em;}
+  .field{margin-bottom:18px;}
+  input[type=text], input[type=number], input[type=password], textarea{
+    width:100%; padding:11px 13px; border-radius:12px; background:var(--panel);
+    border:1px solid var(--stroke); color:var(--txt); font-size:14px; font-family:inherit; outline:none;
+  }
+  input:focus, textarea:focus{border-color:var(--stroke-hi);}
+  textarea{resize:vertical; min-height:70px;}
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  .hint{font-size:12px; color:var(--muted); margin-top:5px;}
+  button{
+    padding:13px; border-radius:12px; border:none; cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#1a0f00;
+    font-weight:800; font-size:14px; letter-spacing:.02em;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  button:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(255,140,20,.35);}
+  button.secondary{background:var(--panel-hi); color:var(--txt); border:1px solid var(--stroke);}
+  button.wide{width:100%; margin-top:6px;}
+  button.chip{padding:8px 14px; font-size:12px; font-weight:700; background:var(--panel-hi); color:var(--txt); border:1px solid var(--stroke);}
+  .chips{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
+  .out{margin-top:20px; display:none;}
+  .out.show{display:block;}
+  .out textarea{font-family:'Consolas','Monaco',monospace; font-size:12px; min-height:100px; color:var(--ok);}
+  .steps{background:var(--panel); border:1px solid var(--stroke); border-radius:14px; padding:16px 18px; margin-top:14px; font-size:13px; line-height:1.7; color:var(--muted);}
+  .steps b{color:var(--txt);}
+  .badge{display:inline-block; font-size:11px; font-weight:800; padding:3px 9px; border-radius:20px; background:rgba(47,216,115,.15); color:var(--ok); border:1px solid rgba(47,216,115,.35);}
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--card); border:1px solid var(--stroke-hi); color:var(--txt); padding:12px 20px;
+    border-radius:12px; font-size:13px; font-weight:700; transition:.3s; box-shadow:0 12px 30px rgba(0,0,0,.5); z-index:999;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .divider{height:1px; background:var(--stroke); margin:24px 0;}
+  .sec-title{font-size:13px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+
+  .prev-wrap{padding:20px; border-radius:16px; background:radial-gradient(120% 100% at 30% 0%, #1a2032, #0a0e18); border:1px solid var(--stroke); margin-bottom:18px; min-height:70px; display:flex; align-items:center;}
+  .prev-pop{display:flex; align-items:center; gap:14px; width:100%; padding:16px 18px; border-radius:20px;
+    background:rgba(20,22,34,.96); border:1px solid rgba(255,255,255,.3); color:#fff;
+    box-shadow:0 18px 40px rgba(0,0,0,.5); backdrop-filter:blur(10px);}
+  .prev-ic{flex:none; width:44px; height:44px; border-radius:13px; display:grid; place-items:center; font-size:22px;
+    background:linear-gradient(140deg, var(--accent), var(--accent-2));}
+  .prev-body{flex:1; min-width:0;}
+  .prev-title{font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--accent-2); margin-bottom:3px;}
+  .prev-text{font-size:14px; font-weight:700; line-height:1.3;}
+  .prev-empty{color:var(--muted); font-size:13px; margin:0 auto;}
+
+  .hist-item{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:var(--panel); border:1px solid var(--stroke); margin-bottom:8px; font-size:13px;}
+  .hist-meta{flex:1; min-width:0;}
+  .hist-time{color:var(--muted); font-size:11px;}
+  .hist-desc{font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .hist-empty{color:var(--muted); font-size:13px; text-align:center; padding:10px;}
+
+  .live-box{background:var(--panel); border:1px solid var(--stroke); border-radius:14px; padding:14px 16px; margin-top:10px; font-size:13px; line-height:1.7;}
+  .live-box b{color:var(--txt);}
+  .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px;}
+  .dot.ok{background:var(--ok); box-shadow:0 0 8px var(--ok);}
+  .dot.warn{background:#ffc93d;}
+  .dot.bad{background:var(--bad);}
+
+  #lockScreen{position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:1000;}
+  #lockScreen .card{max-width:340px; text-align:center;}
+  #lockScreen input{text-align:center; font-size:20px; letter-spacing:.3em; font-family:'Consolas',monospace;}
+  #mainWrap{display:none;}
+  #mainWrap.show{display:block;}
+</style>
+</head>
+<body>
+
+  <div id="lockScreen">
+    <div class="card">
+      <h1 style="justify-content:center;">🔒 Locked</h1>
+      <div class="sub">Enter your PIN to open the settings panel.</div>
+      <input type="password" id="pinInput" inputmode="numeric" maxlength="12" placeholder="••••••" autofocus>
+      <button class="wide" id="unlockBtn" style="margin-top:14px;">Unlock</button>
+      <div class="hint" id="pinErr" style="color:var(--bad); min-height:16px; margin-top:8px;"></div>
+      <div class="steps" style="text-align:left; margin-top:20px;">
+        First time setting this up? Open <b>browser console (F12)</b> on this page and run:<br>
+        <code>hashPin("your-new-pin")</code><br>
+        Copy the number it prints, paste it into <b>PIN_HASH</b> near the top of this file's script, then re-deploy.
+      </div>
+    </div>
+  </div>
+
+  <div id="mainWrap">
+  <div class="card">
+    <h1>⚙️ Attendance Pro <span class="badge">Panel</span></h1>
+    <div class="sub">Set today's target and/or send a notice to everyone using the script. Output is <b>encrypted</b> — unreadable to anyone browsing the raw file on GitHub.</div>
+
+    <div class="chips">
+      <button class="chip" data-h="8" data-m="30">🕗 Normal · 8h 30m</button>
+      <button class="chip" data-h="6" data-m="0">🏃 Early release · 6h</button>
+      <button class="chip" data-h="4" data-m="0">🌤 Half day · 4h</button>
+      <button class="chip" data-h="0" data-m="0">🎉 Day off · 0h</button>
+    </div>
+
+    <div class="field">
+      <label>Today's target</label>
+      <div class="row">
+        <input type="number" id="th" min="0" max="24" placeholder="Hours" value="8">
+        <input type="number" id="tm" min="0" max="59" placeholder="Minutes" value="30">
+      </div>
+      <div class="hint">Use a quick preset above, or set custom hours/minutes.</div>
+    </div>
+
+    <div class="field">
+      <label>Notice message (optional)</label>
+      <textarea id="notice" placeholder="e.g. Leaving early today, 5 PM! Please wrap up."></textarea>
+    </div>
+
+    <div class="sec-title">👀 Live preview</div>
+    <div class="prev-wrap" id="previewWrap">
+      <div class="prev-empty">Type a notice above to preview it here</div>
+    </div>
+
+    <button class="wide" id="genBtn">🔒 Generate encrypted config</button>
+
+    <div class="out" id="out">
+      <label style="margin-top:18px;">Encrypted output — paste this as the ENTIRE content of <b>kap-config.json</b></label>
+      <textarea id="result" readonly></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="secondary" id="copyBtn">📋 Copy</button>
+      </div>
+      <div class="steps">
+        <b>1.</b> Open your GitHub repo → <b>kap-config.json</b> (create it if missing).<br>
+        <b>2.</b> Replace its entire content with the text above, then commit.<br>
+        <b>3.</b> Everyone's script picks it up on their next page load — no reinstall needed.
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sec-title">🔍 Check what's currently live</div>
+    <button class="secondary wide" id="checkLiveBtn">Fetch &amp; decrypt the published config</button>
+    <div id="liveResult"></div>
+
+    <div class="divider"></div>
+
+    <div class="sec-title">🕘 Recent configs (this browser only)</div>
+    <div id="history"></div>
+  </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const SECRET = 'Kk4pT-9xQ2vR7mZs-Sagar-Panel-Secret-2026';
+const CONFIG_URL = 'https://cdn.jsdelivr.net/gh/sagar-21/keka-attendance-sagar1@main/kap-config.json';
+const PIN_HASH = 0xa6f48af; // default PIN is "sagar2026" — CHANGE THIS before hosting publicly
+
+function fnv(s) { let h = 0x811c9dc5; for (const ch of s) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h; }
+window.hashPin = (pin) => { const h = fnv(String(pin)); console.log('PIN_HASH =', '0x' + h.toString(16), ' (paste this into the file)'); return h; };
+
+function rc4(keyBytes, dataBytes) {
+  const S = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) S[i] = i;
+  let j = 0;
+  for (let i = 0; i < 256; i++) { j = (j + S[i] + keyBytes[i % keyBytes.length]) & 255; const t = S[i]; S[i] = S[j]; S[j] = t; }
+  const out = new Uint8Array(dataBytes.length);
+  let a = 0, b = 0;
+  for (let k = 0; k < dataBytes.length; k++) { a = (a + 1) & 255; b = (b + S[a]) & 255; const t = S[a]; S[a] = S[b]; S[b] = t; out[k] = dataBytes[k] ^ S[(S[a] + S[b]) & 255]; }
+  return out;
+}
+function bytesToB64(bytes) { let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]); return btoa(bin); }
+function b64ToBytes(b64) { const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return arr; }
+function randomSalt(len = 16) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let s = ''; const arr = new Uint8Array(len); crypto.getRandomValues(arr);
+  for (let i = 0; i < len; i++) s += chars[arr[i] % chars.length];
+  return s;
+}
+function encryptPayload(obj) {
+  const salt = randomSalt();
+  const plaintext = JSON.stringify(obj);
+  const keyBytes = new TextEncoder().encode(SECRET + salt);
+  const ctBytes = rc4(keyBytes, new TextEncoder().encode(plaintext));
+  return { salt, ct: bytesToB64(ctBytes) };
+}
+function decryptPayload(payload) {
+  const keyBytes = new TextEncoder().encode(SECRET + payload.salt);
+  const ptBytes = rc4(keyBytes, b64ToBytes(payload.ct));
+  return JSON.parse(new TextDecoder().decode(ptBytes));
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function tryUnlock() {
+  const val = document.getElementById('pinInput').value;
+  if (fnv(val) === PIN_HASH) {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('mainWrap').classList.add('show');
+    try { sessionStorage.setItem('kapPanelUnlocked', '1'); } catch (e) {}
+  } else {
+    document.getElementById('pinErr').textContent = 'Incorrect PIN';
+    document.getElementById('pinInput').value = '';
+  }
+}
+document.getElementById('unlockBtn').addEventListener('click', tryUnlock);
+document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+try {
+  if (sessionStorage.getItem('kapPanelUnlocked') === '1') {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('mainWrap').classList.add('show');
+  }
+} catch (e) {}
+
+document.querySelectorAll('.chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('th').value = btn.dataset.h;
+    document.getElementById('tm').value = btn.dataset.m;
+    toast(btn.textContent.trim() + ' applied');
+  });
+});
+
+function renderPreview() {
+  const notice = document.getElementById('notice').value.trim();
+  const wrap = document.getElementById('previewWrap');
+  if (!notice) { wrap.innerHTML = '<div class="prev-empty">Type a notice above to preview it here</div>'; return; }
+  wrap.innerHTML = `
+    <div class="prev-pop">
+      <div class="prev-ic">📣</div>
+      <div class="prev-body">
+        <div class="prev-title">Notice</div>
+        <div class="prev-text"></div>
+      </div>
+    </div>`;
+  wrap.querySelector('.prev-text').textContent = notice;
+}
+document.getElementById('notice').addEventListener('input', renderPreview);
+
+const HIST_KEY = 'kapPanelHistory_v1';
+function getHistory() { try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch (e) { return []; } }
+function saveHistory(list) { try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, 5))); } catch (e) {} }
+function renderHistory() {
+  const list = getHistory();
+  const el = document.getElementById('history');
+  if (!list.length) { el.innerHTML = '<div class="hist-empty">Nothing generated yet</div>'; return; }
+  el.innerHTML = list.map((h, i) => `
+    <div class="hist-item">
+      <div class="hist-meta">
+        <div class="hist-desc">${h.desc}</div>
+        <div class="hist-time">${new Date(h.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>
+      </div>
+      <button class="secondary" data-i="${i}" style="padding:7px 12px; font-size:12px;">↺ Restore</button>
+    </div>`).join('');
+  el.querySelectorAll('button[data-i]').forEach(b => b.addEventListener('click', () => {
+    const h = list[+b.dataset.i];
+    document.getElementById('th').value = h.h;
+    document.getElementById('tm').value = h.m;
+    document.getElementById('notice').value = h.notice || '';
+    renderPreview();
+    toast('Restored into the form — review and generate again');
+  }));
+}
+renderHistory();
+
+document.getElementById('genBtn').addEventListener('click', () => {
+  const h = parseInt(document.getElementById('th').value, 10) || 0;
+  const m = parseInt(document.getElementById('tm').value, 10) || 0;
+  const notice = document.getElementById('notice').value.trim();
+  const todayTargetMin = h * 60 + m;
+
+  const payloadObj = { todayTargetMin };
+  let desc = `Target: ${h}h ${m}m`;
+  if (notice) { payloadObj.notice = notice; payloadObj.noticeId = 'notice-' + Date.now(); desc += ' · with notice'; }
+
+  const fileJson = JSON.stringify(encryptPayload(payloadObj), null, 2);
+  document.getElementById('result').value = fileJson;
+  document.getElementById('out').classList.add('show');
+  toast('Encrypted — copy it into kap-config.json');
+
+  const list = getHistory();
+  list.unshift({ desc, h, m, notice, at: Date.now() });
+  saveHistory(list);
+  renderHistory();
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const ta = document.getElementById('result');
+  navigator.clipboard.writeText(ta.value).then(() => toast('Copied to clipboard ✓'))
+    .catch(() => { ta.select(); document.execCommand('copy'); toast('Copied to clipboard ✓'); });
+});
+
+document.getElementById('checkLiveBtn').addEventListener('click', async () => {
+  const box = document.getElementById('liveResult');
+  box.innerHTML = '<div class="live-box">Checking…</div>';
+  try {
+    const res = await fetch(CONFIG_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) {
+      box.innerHTML = '<div class="live-box"><span class="dot warn"></span><b>Nothing published yet</b><br>No config file found at this URL. This is normal if you have not created kap-config.json yet, or if there is no active override right now.</div>';
+      return;
+    }
+    const payload = await res.json();
+    const cfg = decryptPayload(payload);
+    const tH = Math.floor((cfg.todayTargetMin || 0) / 60), tM = (cfg.todayTargetMin || 0) % 60;
+    box.innerHTML = `<div class="live-box">
+      <span class="dot ok"></span><b>Live and decrypted successfully</b><br>
+      Target override: <b>${cfg.todayTargetMin ? tH + 'h ' + tM + 'm' : 'none (default 8h 30m)'}</b><br>
+      Notice: <b>${cfg.notice ? '"' + cfg.notice + '"' : 'none'}</b>
+    </div>`;
+  } catch (e) {
+    box.innerHTML = '<div class="live-box"><span class="dot bad"></span><b>Could not verify</b><br>Either the file is not published yet, or it does not match this panel secret key.</div>';
+  }
+});
+</script>
+</body>
+</html>
