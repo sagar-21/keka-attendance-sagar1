@@ -216,6 +216,10 @@
     <div class="field">
       <textarea id="newNoticeText" placeholder="e.g. Leaving early today, 5 PM!"></textarea>
     </div>
+    <div class="field" style="display:flex; align-items:center; gap:10px;">
+      <input type="checkbox" id="noticeRemovable" checked style="width:18px; height:18px; accent-color:var(--accent); cursor:pointer;">
+      <label for="noticeRemovable" class="hint" style="margin:0; cursor:pointer;">Let users dismiss (✕) this notice themselves — uncheck to make it mandatory (only you can remove it)</label>
+    </div>
     <button class="wide" id="addNoticeBtn">＋ Publish new notice</button>
     <div id="noticesList" style="margin-top:14px;"></div>
 
@@ -606,9 +610,14 @@ function renderNotices(notices) {
   el.innerHTML = ids.map(id => `
     <div class="notice-item" data-id="${id}">
       <span class="notice-txt"></span>
+      <span class="badge" style="background:rgba(255,255,255,.08); color:var(--muted); border-color:var(--stroke);"></span>
       <button class="danger" data-del="${id}" style="padding:7px 12px; font-size:12px;">🗑 Delete</button>
     </div>`).join('');
-  ids.forEach(id => { el.querySelector(`[data-id="${id}"] .notice-txt`).textContent = notices[id].text || ''; });
+  ids.forEach(id => {
+    el.querySelector(`[data-id="${id}"] .notice-txt`).textContent = notices[id].text || '';
+    const removable = notices[id].removable !== false;
+    el.querySelector(`[data-id="${id}"] .badge`).textContent = removable ? '✕ dismissible' : '🔒 mandatory';
+  });
   el.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
     const ok = await askTotp('Enter your 2FA code to delete this notice.');
     if (!ok) return;
@@ -627,10 +636,11 @@ document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   if (!text) { toast('Write a notice first'); return; }
   const ok = await askTotp('Enter your 2FA code to publish this notice.');
   if (!ok) return;
+  const removable = document.getElementById('noticeRemovable').checked;
   const id = 'n' + Date.now();
-  db.ref('kapNotices/' + id).set({ text, createdAt: Date.now() }).then(() => {
+  db.ref('kapNotices/' + id).set({ text, createdAt: Date.now(), removable }).then(() => {
     document.getElementById('newNoticeText').value = '';
-    toast('Notice published — live for everyone within ~15s');
+    toast(removable ? 'Notice published (dismissible) — live within ~15s' : 'Notice published (mandatory, no ✕ for users) — live within ~15s');
   }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 </script>
