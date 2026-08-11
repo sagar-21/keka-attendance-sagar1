@@ -456,7 +456,20 @@ document.getElementById('secqCancelBtn').addEventListener('click', () => {
 const FB_CFG_KEY = 'kapFirebaseConfig_v1';
 let db, auth;
 
+function firebaseSdkMissing() {
+  return typeof firebase === 'undefined';
+}
+if (firebaseSdkMissing()) {
+  document.getElementById('setupScreen').style.display = 'flex';
+  document.querySelector('#setupScreen .sub').innerHTML =
+    '<span style="color:var(--bad); font-weight:700;">The Firebase SDK failed to load from the Google CDN (gstatic.com) — ' +
+    'this usually means an ad-blocker, privacy extension, or network/firewall is blocking it. ' +
+    'Try disabling ad-blockers for this page, or open it in a different browser, then reload.</span>';
+  document.getElementById('saveFbConfig').disabled = true;
+}
+
 function initFirebase(cfg) {
+  if (firebaseSdkMissing()) { throw new Error('SDK_MISSING'); }
   firebase.initializeApp(cfg);
   auth = firebase.auth();
   db = firebase.database();
@@ -515,20 +528,33 @@ async function renderSessionInfo(user) {
   } catch (e) {}
 }
 
-try {
-  const saved = localStorage.getItem(FB_CFG_KEY);
-  if (saved) initFirebase(JSON.parse(saved));
-  else document.getElementById('setupScreen').style.display = 'flex';
-} catch (e) { document.getElementById('setupScreen').style.display = 'flex'; }
+if (!firebaseSdkMissing()) {
+  try {
+    const saved = localStorage.getItem(FB_CFG_KEY);
+    if (saved) initFirebase(JSON.parse(saved));
+    else document.getElementById('setupScreen').style.display = 'flex';
+  } catch (e) { document.getElementById('setupScreen').style.display = 'flex'; }
+}
 
 document.getElementById('saveFbConfig').addEventListener('click', () => {
+  if (firebaseSdkMissing()) {
+    toast('Firebase SDK did not load — check ad-blocker/network, see message above');
+    return;
+  }
+  let cfg;
   try {
-    const cfg = JSON.parse(document.getElementById('fbConfigInput').value);
+    cfg = JSON.parse(document.getElementById('fbConfigInput').value);
+  } catch (e) {
+    toast('That does not look like valid JSON — check and try again');
+    return;
+  }
+  try {
     localStorage.setItem(FB_CFG_KEY, JSON.stringify(cfg));
     initFirebase(cfg);
     toast('Firebase connected ✓');
   } catch (e) {
-    toast('That does not look like valid JSON — check and try again');
+    toast('Firebase rejected this config: ' + (e && e.message ? e.message : 'unknown error') + ' — check the console (F12) for details');
+    console.error('Firebase init failed:', e);
   }
 });
 
