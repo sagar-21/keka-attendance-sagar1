@@ -108,6 +108,24 @@
     </div>
   </div>
 
+  <div id="totpSetupModal" style="display:none;">
+    <div class="card" style="max-width:420px; text-align:center;">
+      <h1 style="justify-content:center;">🔐 Set up 2FA</h1>
+      <div class="sub" style="text-align:left; color:var(--bad); font-weight:700;">
+        ⚠️ This code is shown ONE TIME ONLY and works exactly like a password.
+        Anyone who sees it can generate valid codes on their own phone. Do not
+        screen-share, screenshot, or read it aloud while this is visible.
+      </div>
+      <div class="totp-secret" id="totpSetupSecret"></div>
+      <div class="sub" style="text-align:left;">
+        Open <b>Google Authenticator</b> (or Authy) → <b>+</b> → "Enter a setup key" →
+        paste this code → type: <b>Time-based</b>. Then confirm below once you've added it.
+      </div>
+      <button class="wide" id="totpSetupDoneBtn">I've added it — hide this now</button>
+      <div class="hint" style="margin-top:10px;">After you confirm, this code will never be shown again on this screen. If you lose access, use "Reset 2FA" to generate a brand new one.</div>
+    </div>
+  </div>
+
   <div id="mainWrap">
   <div class="card">
     <div class="userbar">
@@ -238,18 +256,28 @@ function askTotp(promptText) {
   });
 }
 
-/* ── 2FA setup flow ── */
+/* ── 2FA setup flow — secret is shown exactly once, then never again ── */
 document.getElementById('setup2faBtn').addEventListener('click', async () => {
   const existing = getTotpSecret();
   if (existing) {
-    const ok = confirm('2FA is already set up on this browser. Reset it and generate a new secret?');
+    const ok = confirm('2FA is already set up on this browser. Reset it and generate a brand new secret? (Your old authenticator entry will stop working.)');
     if (!ok) return;
   }
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   const secret = base32Encode(bytes);
   setTotpSecret(secret);
-  alert('New 2FA secret generated:\\n\\n' + secret + '\\n\\nOpen Google Authenticator (or Authy) → Add account → "Enter a setup key" → paste this secret, type: Time-based.\\n\\nYou will need the 6-digit code from that app for every save/publish/delete from now on.');
-  toast('2FA secret generated — set up your authenticator app now');
+
+  const modal = document.getElementById('totpSetupModal');
+  const secretEl = document.getElementById('totpSetupSecret');
+  secretEl.textContent = secret;
+  modal.style.display = 'flex';
+
+  document.getElementById('totpSetupDoneBtn').onclick = () => {
+    secretEl.textContent = '••••••••••••••••••••••••';
+    modal.style.display = 'none';
+    toast('2FA is now active — a code will be required for every write');
+    renderSessionInfo(auth.currentUser);
+  };
 });
 
 /* ── Firebase init + auth ── */
