@@ -266,6 +266,43 @@ function toast(msg) {
 }
 
 /* ── TOTP (RFC 6238) — same tech as Google Authenticator, fully offline ── */
+/* ── RC4 encryption for kapConfig/kapNotices — keeps the raw network
+   payload unreadable to anyone inspecting the browser's Network tab.
+   Must match the exact same algorithm + secret used in the userscript. */
+const REMOTE_SECRET = 'Kk4pT-9xQ2vR7mZs-Sagar-Panel-Secret-2026';
+function rc4(keyBytes, dataBytes) {
+  const S = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) S[i] = i;
+  let j = 0;
+  for (let i = 0; i < 256; i++) { j = (j + S[i] + keyBytes[i % keyBytes.length]) & 255; const t = S[i]; S[i] = S[j]; S[j] = t; }
+  const out = new Uint8Array(dataBytes.length);
+  let a = 0, b = 0;
+  for (let k = 0; k < dataBytes.length; k++) { a = (a + 1) & 255; b = (b + S[a]) & 255; const t = S[a]; S[a] = S[b]; S[b] = t; out[k] = dataBytes[k] ^ S[(S[a] + S[b]) & 255]; }
+  return out;
+}
+function bytesToB64(bytes) { let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]); return btoa(bin); }
+function b64ToBytes(b64) { const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return arr; }
+function randomSalt(len = 16) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let s = ''; const arr = new Uint8Array(len); crypto.getRandomValues(arr);
+  for (let i = 0; i < len; i++) s += chars[arr[i] % chars.length];
+  return s;
+}
+function encryptForNetwork(obj) {
+  const salt = randomSalt();
+  const keyBytes = new TextEncoder().encode(REMOTE_SECRET + salt);
+  const ctBytes = rc4(keyBytes, new TextEncoder().encode(JSON.stringify(obj)));
+  return { salt, ct: bytesToB64(ctBytes) };
+}
+function decryptFromNetwork(payload) {
+  if (!payload || !payload.salt || !payload.ct) return null;
+  try {
+    const keyBytes = new TextEncoder().encode(REMOTE_SECRET + payload.salt);
+    const ptBytes = rc4(keyBytes, b64ToBytes(payload.ct));
+    return JSON.parse(new TextDecoder().decode(ptBytes));
+  } catch (e) { return null; }
+}
+
 function base32Encode(bytes) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = 0, value = 0, output = '';
@@ -608,7 +645,7 @@ document.querySelectorAll('.chip').forEach(btn => {
 
 function loadTarget() {
   db.ref('kapConfig').once('value').then(snap => {
-    const cfg = snap.val();
+    const cfg = decryptFromNetwork(snap.val());
     if (cfg && typeof cfg.todayTargetMin === 'number') {
       document.getElementById('th').value = Math.floor(cfg.todayTargetMin / 60);
       document.getElementById('tm').value = cfg.todayTargetMin % 60;
@@ -621,13 +658,17 @@ document.getElementById('saveTargetBtn').addEventListener('click', async () => {
   if (!ok) return;
   const h = parseInt(document.getElementById('th').value, 10) || 0;
   const m = parseInt(document.getElementById('tm').value, 10) || 0;
-  db.ref('kapConfig').set({ todayTargetMin: h * 60 + m, updatedAt: Date.now() }).then(() => {
-    toast('Target published — live for everyone within ~15s');
-    document.getElementById('statusMsg').textContent = 'Target saved ✓';
+  const encrypted = encryptForNetwork({ todayTargetMin: h * 60 + m, updatedAt: Date.now() });
+  db.ref('kapConfig').set(encrypted).then(() => {
+    toast('Target published (encrypted) — live for everyone within ~30s');
+    document.getElementById('statusMsg').textContent = 'Target saved ✓ (encrypted on the wire)';
   }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 
-/* ── notices (multiple, add/delete, with optional expiry) ── */
+/* ── notices (multiple, add/delete, with optional expiry) ──
+   The whole notices map is stored as ONE encrypted blob at 'kapNotices'
+   (not per-id children), so the raw network payload never reveals any
+   notice text — add/delete does a decrypt → modify → re-encrypt → write. */
 function fmtExpiry(n) {
   if (!n.expiresAt) return 'Never expires';
   const ms = Number(n.expiresAt);
@@ -658,14 +699,18 @@ function renderNotices(notices) {
   el.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
     const ok = await askTotp('Enter your 2FA code to delete this notice.');
     if (!ok) return;
-    db.ref('kapNotices/' + btn.dataset.del).remove().then(() => toast('Notice deleted — removed for everyone within ~15s'));
+    const snap = await db.ref('kapNotices').once('value');
+    const current = decryptFromNetwork(snap.val()) || {};
+    delete current[btn.dataset.del];
+    const encrypted = encryptForNetwork(current);
+    db.ref('kapNotices').set(encrypted).then(() => toast('Notice deleted — removed for everyone within ~30s'));
   }));
 }
 
 function listenNotices() {
   // real-time listener for the ADMIN PANEL itself (instant here; the userscript
   // uses polling instead, to avoid loading the Firebase SDK into the Keka page)
-  db.ref('kapNotices').on('value', snap => renderNotices(snap.val() || {}));
+  db.ref('kapNotices').on('value', snap => renderNotices(decryptFromNetwork(snap.val()) || {}));
 }
 
 /* expiry-mode radio toggling */
@@ -697,12 +742,17 @@ document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   if (!ok) return;
   const removable = document.getElementById('noticeRemovable').checked;
   const id = 'n' + Date.now();
-  const payload = { text, createdAt: Date.now(), removable };
-  if (expiresAt) payload.expiresAt = expiresAt;
-  db.ref('kapNotices/' + id).set(payload).then(() => {
+  const noticePayload = { text, createdAt: Date.now(), removable };
+  if (expiresAt) noticePayload.expiresAt = expiresAt;
+
+  const snap = await db.ref('kapNotices').once('value');
+  const current = decryptFromNetwork(snap.val()) || {};
+  current[id] = noticePayload;
+  const encrypted = encryptForNetwork(current);
+  db.ref('kapNotices').set(encrypted).then(() => {
     document.getElementById('newNoticeText').value = '';
     const expiryMsg = expiresAt ? (' · expires ' + new Date(expiresAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })) : '';
-    toast((removable ? 'Notice published (dismissible)' : 'Notice published (mandatory)') + expiryMsg);
+    toast((removable ? 'Notice published (dismissible)' : 'Notice published (mandatory)') + expiryMsg + ' — encrypted');
   }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 </script>
