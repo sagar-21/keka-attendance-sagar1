@@ -45,6 +45,9 @@
   button.danger{background:linear-gradient(135deg,#ff5560,#ff8a5b); color:#1a0500;}
   button.wide{width:100%; margin-top:6px;}
   button.chip{padding:8px 14px; font-size:12px; font-weight:700; background:var(--panel-hi); color:var(--txt); border:1px solid var(--stroke);}
+  .emoji-opt{padding:8px 12px; font-size:18px; background:var(--panel-hi); color:var(--txt); border:1px solid var(--stroke); border-radius:10px; cursor:pointer; transition:transform .15s, border-color .15s;}
+  .emoji-opt:hover{transform:translateY(-2px);}
+  .emoji-opt.active{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 18%, var(--panel-hi));}
   .chips{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
   .steps{background:var(--panel); border:1px solid var(--stroke); border-radius:14px; padding:16px 18px; margin-top:14px; font-size:13px; line-height:1.7; color:var(--muted);}
   .steps b{color:var(--txt);}
@@ -243,6 +246,22 @@
         <option value="259200000">3 days</option>
         <option value="604800000">1 week</option>
       </select>
+    </div>
+
+    <div class="field">
+      <label>Icon (shown next to the message, gently bouncing)</label>
+      <div class="chips" id="noticeEmojiPicker" style="margin-bottom:8px;">
+        <button type="button" class="emoji-opt active" data-emoji="📣">📣</button>
+        <button type="button" class="emoji-opt" data-emoji="🎉">🎉</button>
+        <button type="button" class="emoji-opt" data-emoji="⚠️">⚠️</button>
+        <button type="button" class="emoji-opt" data-emoji="💡">💡</button>
+        <button type="button" class="emoji-opt" data-emoji="🔥">🔥</button>
+        <button type="button" class="emoji-opt" data-emoji="🚀">🚀</button>
+        <button type="button" class="emoji-opt" data-emoji="💧">💧</button>
+        <button type="button" class="emoji-opt" data-emoji="⏰">⏰</button>
+      </div>
+      <input type="text" id="noticeGifUrl" placeholder="Or paste a GIF/image URL instead (optional) — e.g. from Giphy, Tenor, Imgur">
+      <div class="hint">If a GIF URL is given, it's used instead of the emoji above.</div>
     </div>
 
     <button class="wide" id="addNoticeBtn">＋ Publish new notice</button>
@@ -721,6 +740,15 @@ document.querySelectorAll('input[name="expiryMode"]').forEach(radio => {
   });
 });
 
+let selectedEmoji = '📣';
+document.querySelectorAll('.emoji-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.emoji-opt').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedEmoji = btn.dataset.emoji;
+  });
+});
+
 function computeExpiresAt() {
   if (document.getElementById('expiryUntil').checked) {
     const v = document.getElementById('expiryUntilInput').value;
@@ -741,8 +769,10 @@ document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   const ok = await askTotp('Enter your 2FA code to publish this notice.');
   if (!ok) return;
   const removable = document.getElementById('noticeRemovable').checked;
+  const gifUrl = document.getElementById('noticeGifUrl').value.trim();
   const id = 'n' + Date.now();
-  const noticePayload = { text, createdAt: Date.now(), removable };
+  const noticePayload = { text, createdAt: Date.now(), removable, icon: selectedEmoji };
+  if (gifUrl) noticePayload.gifUrl = gifUrl;
   if (expiresAt) noticePayload.expiresAt = expiresAt;
 
   const snap = await db.ref('kapNotices').once('value');
@@ -751,6 +781,7 @@ document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   const encrypted = encryptForNetwork(current);
   db.ref('kapNotices').set(encrypted).then(() => {
     document.getElementById('newNoticeText').value = '';
+    document.getElementById('noticeGifUrl').value = '';
     const expiryMsg = expiresAt ? (' · expires ' + new Date(expiresAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })) : '';
     toast((removable ? 'Notice published (dismissible)' : 'Notice published (mandatory)') + expiryMsg + ' — encrypted');
   }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
