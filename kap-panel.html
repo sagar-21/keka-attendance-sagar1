@@ -215,6 +215,14 @@
 
     <div class="divider"></div>
 
+    <div class="sec-title">🔄 Script version (for auto-update banner)</div>
+    <div class="sub" style="margin-bottom:12px;">When you publish new userscript code to GitHub, update this to match the <code>@version</code> in the script header, then Save target above. Anyone with an already-open tab running an older version will see a "Refresh now" prompt within ~30s.</div>
+    <div class="field">
+      <input type="text" id="scriptVersion" placeholder="e.g. 7.7.0">
+    </div>
+
+    <div class="divider"></div>
+
     <div class="sec-title">📣 Notices (multiple, everyone sees active ones)</div>
     <div class="field">
       <textarea id="newNoticeText" placeholder="e.g. Leaving early today, 5 PM!"></textarea>
@@ -682,6 +690,9 @@ function loadTarget() {
       document.getElementById('th').value = Math.floor(cfg.todayTargetMin / 60);
       document.getElementById('tm').value = cfg.todayTargetMin % 60;
     }
+    if (cfg && cfg.latestVersion) {
+      document.getElementById('scriptVersion').value = cfg.latestVersion;
+    }
   });
 }
 
@@ -690,7 +701,10 @@ document.getElementById('saveTargetBtn').addEventListener('click', async () => {
   if (!ok) return;
   const h = parseInt(document.getElementById('th').value, 10) || 0;
   const m = parseInt(document.getElementById('tm').value, 10) || 0;
-  const encrypted = encryptForNetwork({ todayTargetMin: h * 60 + m, updatedAt: Date.now() });
+  const version = document.getElementById('scriptVersion').value.trim();
+  const payload = { todayTargetMin: h * 60 + m, updatedAt: Date.now() };
+  if (version) payload.latestVersion = version;
+  const encrypted = encryptForNetwork(payload);
   db.ref('kapConfig').set(encrypted).then(() => {
     toast('Target published (encrypted) — live for everyone within ~30s');
     document.getElementById('statusMsg').textContent = 'Target saved ✓ (encrypted on the wire)';
