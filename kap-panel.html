@@ -225,6 +225,19 @@
     </div>
 
     <div class="field">
+      <label>When should this go live?</label>
+      <div class="row" style="margin-bottom:8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--txt);">
+          <input type="radio" name="scheduleMode" id="scheduleNow" value="now" checked style="accent-color:var(--accent);"> Right now
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--txt);">
+          <input type="radio" name="scheduleMode" id="scheduleLater" value="later" style="accent-color:var(--accent);"> Schedule for later
+        </label>
+      </div>
+      <input type="datetime-local" id="scheduleLaterInput" style="display:none;">
+    </div>
+
+    <div class="field">
       <label>How long should this stay visible?</label>
       <div class="row" style="margin-bottom:8px;">
         <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--txt);">
@@ -688,6 +701,12 @@ document.getElementById('saveTargetBtn').addEventListener('click', async () => {
    The whole notices map is stored as ONE encrypted blob at 'kapNotices'
    (not per-id children), so the raw network payload never reveals any
    notice text — add/delete does a decrypt → modify → re-encrypt → write. */
+function fmtSchedule(n) {
+  if (!n.startsAt) return null;
+  const ms = Number(n.startsAt);
+  if (Date.now() < ms) return '🕒 Scheduled: ' + new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  return null; // already started — nothing extra to show
+}
 function fmtExpiry(n) {
   if (!n.expiresAt) return 'Never expires';
   const ms = Number(n.expiresAt);
@@ -702,13 +721,17 @@ function renderNotices(notices) {
     <div class="notice-item" data-id="${id}" style="flex-wrap:wrap;">
       <span class="notice-txt" style="flex-basis:100%;"></span>
       <span class="badge" style="background:rgba(255,255,255,.08); color:var(--muted); border-color:var(--stroke);"></span>
+      <span class="badge schedule-badge" style="background:rgba(255,255,255,.08); color:var(--accent-2); border-color:var(--stroke); display:none;"></span>
       <span class="badge expiry-badge" style="background:rgba(255,255,255,.08); color:var(--muted); border-color:var(--stroke);"></span>
       <button class="danger" data-del="${id}" style="padding:7px 12px; font-size:12px; margin-left:auto;">🗑 Delete</button>
     </div>`).join('');
   ids.forEach(id => {
     el.querySelector(`[data-id="${id}"] .notice-txt`).textContent = notices[id].text || '';
     const removable = notices[id].removable !== false;
-    el.querySelector(`[data-id="${id}"] .badge`).textContent = removable ? '✕ dismissible' : '🔒 mandatory';
+    el.querySelector(`[data-id="${id}"] .badge:not(.schedule-badge):not(.expiry-badge)`).textContent = removable ? '✕ dismissible' : '🔒 mandatory';
+    const schedMsg = fmtSchedule(notices[id]);
+    const schedBadge = el.querySelector(`[data-id="${id}"] .schedule-badge`);
+    if (schedMsg) { schedBadge.textContent = schedMsg; schedBadge.style.display = 'inline-block'; }
     const expBadge = el.querySelector(`[data-id="${id}"] .expiry-badge`);
     expBadge.textContent = fmtExpiry(notices[id]);
     if (notices[id].expiresAt && Date.now() > Number(notices[id].expiresAt)) {
@@ -740,6 +763,12 @@ document.querySelectorAll('input[name="expiryMode"]').forEach(radio => {
   });
 });
 
+document.querySelectorAll('input[name="scheduleMode"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.getElementById('scheduleLaterInput').style.display = document.getElementById('scheduleLater').checked ? 'block' : 'none';
+  });
+});
+
 let selectedEmoji = '📣';
 document.querySelectorAll('.emoji-opt').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -748,6 +777,15 @@ document.querySelectorAll('.emoji-opt').forEach(btn => {
     selectedEmoji = btn.dataset.emoji;
   });
 });
+
+function computeStartsAt() {
+  if (document.getElementById('scheduleLater').checked) {
+    const v = document.getElementById('scheduleLaterInput').value;
+    if (!v) return null;
+    return new Date(v).getTime();
+  }
+  return null; // right now
+}
 
 function computeExpiresAt() {
   if (document.getElementById('expiryUntil').checked) {
@@ -764,8 +802,11 @@ function computeExpiresAt() {
 document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   const text = document.getElementById('newNoticeText').value.trim();
   if (!text) { toast('Write a notice first'); return; }
+  const startsAt = computeStartsAt();
+  if (document.getElementById('scheduleLater').checked && !startsAt) { toast('Pick a start date/time first'); return; }
   const expiresAt = computeExpiresAt();
-  if (document.getElementById('expiryUntil').checked && !expiresAt) { toast('Pick a date/time first'); return; }
+  if (document.getElementById('expiryUntil').checked && !expiresAt) { toast('Pick an expiry date/time first'); return; }
+  if (startsAt && expiresAt && expiresAt <= startsAt) { toast('Expiry must be after the scheduled start time'); return; }
   const ok = await askTotp('Enter your 2FA code to publish this notice.');
   if (!ok) return;
   const removable = document.getElementById('noticeRemovable').checked;
@@ -773,6 +814,7 @@ document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   const id = 'n' + Date.now();
   const noticePayload = { text, createdAt: Date.now(), removable, icon: selectedEmoji };
   if (gifUrl) noticePayload.gifUrl = gifUrl;
+  if (startsAt) noticePayload.startsAt = startsAt;
   if (expiresAt) noticePayload.expiresAt = expiresAt;
 
   const snap = await db.ref('kapNotices').once('value');
@@ -782,8 +824,9 @@ document.getElementById('addNoticeBtn').addEventListener('click', async () => {
   db.ref('kapNotices').set(encrypted).then(() => {
     document.getElementById('newNoticeText').value = '';
     document.getElementById('noticeGifUrl').value = '';
+    const startMsg = startsAt ? (' · starts ' + new Date(startsAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })) : '';
     const expiryMsg = expiresAt ? (' · expires ' + new Date(expiresAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })) : '';
-    toast((removable ? 'Notice published (dismissible)' : 'Notice published (mandatory)') + expiryMsg + ' — encrypted');
+    toast((removable ? 'Notice published (dismissible)' : 'Notice published (mandatory)') + startMsg + expiryMsg + ' — encrypted');
   }).catch(err => { document.getElementById('statusMsg').textContent = 'Failed: ' + err.message; });
 });
 </script>
